@@ -2,6 +2,8 @@
 #
 # MacRubyで高速にフルスクリーン表示する
 #
+#   http://twitter.com/negipo/status/67572370247913473
+#
 # Reference:
 #   http://d.hatena.ne.jp/Watson/20100413/1271109590
 #   http://www.cocoadev.com/index.pl?CGImageRef
@@ -48,6 +50,7 @@ class ScreenCapture
     image_view.setImage(ns_image)
     image_view.enterFullScreenMode(window.screen, withOptions:nil)
     window.setContentView(image_view)
+
     # フルスクリーン表示する
     window.orderFrontRegardless
     sleep 2
