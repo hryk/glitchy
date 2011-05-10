@@ -43,6 +43,7 @@ class ScreenCapture
   def glitch(filename)
     glitched_file = '/tmp/glitched_capture.jpg'
     %x[cat #{filename} | perl -npe 's/0/9/g' > #{glitched_file}]
+    %x[rm #{filename}]
     return glitched_file
   end
 
