@@ -1,10 +1,13 @@
 #!/usr/bin/env ruby
 #
+# MacRubyで高速にフルスクリーン表示する
+#
 # Reference:
 #   http://d.hatena.ne.jp/Watson/20100413/1271109590
 #   http://www.cocoadev.com/index.pl?CGImageRef
 #   http://d.hatena.ne.jp/Watson/20100823/1282543331
 #
+
 framework 'Cocoa'
 framework 'ApplicationServices'
 
