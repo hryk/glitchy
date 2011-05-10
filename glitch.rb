@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 #
-# MacRubyで高速にフルスクリーン表示する
+# MacRubyで画面グリッチをフルスクリーン表示する
 #
 #   http://twitter.com/negipo/status/67572370247913473
 #
