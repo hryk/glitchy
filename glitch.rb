@@ -1,15 +1,25 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env macruby
 #
 # MacRubyで画面グリッチをフルスクリーン表示する
 #
 #   http://twitter.com/negipo/status/67572370247913473
 #
-# Reference:
+# Tested with MacRuby-0.10
+#
+# References:
+#
 #   http://d.hatena.ne.jp/Watson/20100413/1271109590
 #   http://www.cocoadev.com/index.pl?CGImageRef
 #   http://d.hatena.ne.jp/Watson/20100823/1282543331
+#   http://purigen.seesaa.net/article/137382769.html # how to access binary data in CGImageRef
 #
-# Tested with MacRuby-0.9
+#
+# Changes
+#
+# 2012-01-30 @1VQ9
+#
+#   * 中間ファイル出すのやめた
+#
 #
 
 framework 'Cocoa'
@@ -29,34 +39,33 @@ class ScreenCapture
   end
 
   def capture
-    filename ||= "/tmp/#{Time.now.strftime('%Y-%m-%d-%H%M%S')}.png"
     image = CGWindowListCreateImage(NSRectToCGRect(@screen_rect),
                                     KCGWindowListOptionOnScreenOnly,
                                     KCGNullWindowID,
                                     KCGWindowImageDefault)
     bitmapRep = NSBitmapImageRep.alloc.initWithCGImage(image)
     blob = bitmapRep.representationUsingType(NSJPEGFileType, properties:nil)
-    blob.writeToFile(filename, atomically:true)
-    return filename
+    return blob
   end
 
-  def glitch(filename)
-    glitched_file = '/tmp/glitched_capture.jpg'
-    %x[cat #{filename} | perl -npe 's/0/9/g' > #{glitched_file}]
-    %x[rm #{filename}]
-    return glitched_file
+  def glitch blob
+    byte_length = blob.length
+    100.times.each do
+      target = (rand blob.length).to_i
+      blob.bytes[target] = 0
+    end
+    return blob
   end
 
-  def show_fullscreen(filename)
-    image_to_show = NSImage.alloc.initWithContentsOfFile(filename)
+  def show_fullscreen blob
+    image_to_show = NSImage.alloc.initWithData(blob)
     if image_to_show.nil?
-      puts "Failed to load glitch.: #{filename}";
+      puts "Failed to load glitch.";
       exit;
     end
     image_view = NSImageView.alloc.initWithFrame @screen_rect
     image_view.setImage image_to_show
     image_view.enterFullScreenMode @window.screen, withOptions:nil
-    # フルスクリーン表示する
     @window.orderFrontRegardless
     @window.setContentView image_view
     sleep 2
