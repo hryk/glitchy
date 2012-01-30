@@ -18,60 +18,226 @@
 #
 # 2012-01-30 @1VQ9
 #
+#   * flavor追加
 #   * 中間ファイル出すのやめた
 #
-#
+
+require 'optparse'
 
 framework 'Cocoa'
 framework 'ApplicationServices'
 
-class ScreenCapture
-  attr_reader :window
-  attr_reader :screen_rect
+module Glitch
 
-  def initialize
-    @screen_rect = NSScreen.mainScreen.frame()
-    @window = NSWindow.alloc.initWithContentRect(@screen_rect,
-                                                styleMask:NSBorderlessWindowMask,
-                                                backing:NSBackingStoreBuffered,
-                                                defer:false)
-    @window.setBackgroundColor(NSColor.blackColor)
-  end
+  module Flavor
+    class << self
+      def exists? name
+        class_name = camelcase name.to_s
+        exist = true
+        begin
+          self.const_get class_name
+        rescue NameError => e
+          exist = false
+        end
+        return exist
+      end
 
-  def capture
-    image = CGWindowListCreateImage(NSRectToCGRect(@screen_rect),
-                                    KCGWindowListOptionOnScreenOnly,
-                                    KCGNullWindowID,
-                                    KCGWindowImageDefault)
-    bitmapRep = NSBitmapImageRep.alloc.initWithCGImage(image)
-    blob = bitmapRep.representationUsingType(NSJPEGFileType, properties:nil)
-    return blob
-  end
+      def get name
+        klass = self.const_get camelcase(name.to_s)
+        klass.new
+      end
 
-  def glitch blob
-    byte_length = blob.length
-    100.times.each do
-      target = (rand blob.length).to_i
-      blob.bytes[target] = 0
+      def camelcase string
+        string.gsub(/(^\w|_\w)/){|s| s.gsub('_', '').upcase }
+      end
     end
-    return blob
+
+    class Base
+      def bitmap_image data
+        NSBitmapImageRep.imageRepWithData data
+      end
+    end
+
+    class Jpeg < Base
+      # in     : NSBitmapImageRep
+      # glitch : NSData ( by representationUsingType )
+      # out    : NSBitmapImageRep ( by imageRepWithData )
+      def glitch bitmap, finalize=false
+        data   = bitmap.representationUsingType(NSJPEGFileType, properties:nil)
+        100.times.each do
+          pos = (rand data.length).to_i
+          data.bytes[pos] = 0
+        end
+        if finalize
+          data
+        else
+          bitmap_image(data)
+        end
+      end
+    end
+
+    class Png < Base
+    end
+
+    class Tiff < Base
+    end
+
+    class Gif < Base
+      def glitch bitmap, finalize=false
+      data   = bitmap.representationUsingType(NSGIFFileType, properties:nil)
+      10.times.each do
+        pos = (rand data.length).to_i
+        data.bytes[pos] = 0
+      end
+      if finalize
+        data
+      else
+        bitmap_image(data)
+      end
+      end
+    end
+
+    # ちゃんとグリッチできてない
+    #
+    # class Bmp < Base
+    #   def glitch bitmap, finalize=false
+    #     data   = bitmap.representationUsingType(NSBMPFileType, properties:nil)
+    #     100.times.each do
+    #       pos = (rand data.length).to_i
+    #       data.bytes[pos] = 0
+    #     end
+    #     bitmap_image(data)
+    #     if finalize
+    #       data
+    #     else
+    #       bitmap_image(data)
+    #     end
+    #   end
+    # end
+
   end
 
-  def show_fullscreen blob
-    image_to_show = NSImage.alloc.initWithData(blob)
-    if image_to_show.nil?
-      puts "Failed to load glitch.";
-      exit;
+  class Screen
+    attr_accessor :number, :rect, :window
+
+    def self.glitch options={}
+      screen = new options[:screen]
+      screen.install_flavors options[:flavors]
+      screen.show
+      sleep options[:time]
     end
-    image_view = NSImageView.alloc.initWithFrame @screen_rect
-    image_view.setImage image_to_show
-    image_view.enterFullScreenMode @window.screen, withOptions:nil
-    @window.orderFrontRegardless
-    @window.setContentView image_view
-    sleep 2
+
+    def initialize screen_number
+      @number = screen_number || 0
+      @flavors = []
+      init_window
+    end
+
+    def capture
+      image = CGWindowListCreateImage(NSRectToCGRect(@rect),
+                                      KCGWindowListOptionOnScreenOnly,
+                                      KCGNullWindowID,
+                                      KCGWindowImageDefault)
+      bitmap = NSBitmapImageRep.alloc.initWithCGImage(image)
+      return bitmap
+    end
+
+    def install_flavors flavors
+      flavors.each do |name|
+        flavor = if Flavor.exists? name
+                   Flavor.get name
+                 else
+                   puts "No such flavor: #{name}"
+                 end
+        self << flavor
+      end
+    end
+
+    def << flavor
+      @flavors << flavor
+    end
+
+    def show
+      generate_glitched_data
+      image = NSImage.alloc.initWithData @glitched_data
+      raise "Failed to load glitch." if image.nil?
+      image_view = NSImageView.alloc.initWithFrame @rect
+      image_view.setImage image
+      image_view.enterFullScreenMode @window.screen, withOptions:nil
+      @window.orderFrontRegardless
+      @window.setContentView image_view
+    end
+
+    protected
+
+    def init_window
+      @rect   = NSScreen.screens[@number].frame()
+      @window = NSWindow.alloc.initWithContentRect(@rect,
+                                                   styleMask:NSBorderlessWindowMask,
+                                                   backing:NSBackingStoreBuffered,
+                                                   defer:false)
+      @window.setBackgroundColor(NSColor.blackColor)
+    end
+
+    def generate_glitched_data
+      bitmap = capture
+      @flavors.each_with_index do |f, i|
+        @glitched_data = if !@glitched_data.nil?
+                           if i == (@flavors.length - 1)
+                             f.glitch @glitched_data, true
+                           else
+                             f.glitch @glitched_data
+                           end
+                         else
+                           if i == (@flavors.length - 1)
+                             f.glitch bitmap, true
+                           else
+                             f.glitch bitmap
+                           end
+                         end
+      end
+    end
+
   end
 end
 
+# main program
+
+
 app = NSApplication.sharedApplication
-screenCapture = ScreenCapture.new
-screenCapture.show_fullscreen screenCapture.glitch screenCapture.capture
+
+options = {
+  :flavors     => ['jpeg'],
+  :screen     => 0,
+  :time       => 2
+}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: glitch.rb [options]"
+  opts.separator "Options:"
+
+  opts.on("-f", "--flavors x,y,z", Array, "Specify flavor of glitch.To use multiple flavors, separate by comma.") do |list|
+    options[:flavors] = list
+  end
+
+  opts.on("-s", "--screen N", Numeric, "Number of a target screen.") do |number|
+    puts number
+    options[:screen] = number
+  end
+
+  opts.on("-t", "--time N", Integer,"Time to sleep (sec)") do |v|
+    options[:time] = v
+  end
+
+  opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
+    options[:verbose] = v
+  end
+
+  opts.on("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+end.parse!
+
+Glitch::Screen.glitch options
+
