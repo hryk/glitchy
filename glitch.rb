@@ -143,14 +143,12 @@ module Glitch
       else
         screens << new(options[:screen])
       end
-      queue = Dispatch::Queue.new "com.1vq9.glitchrb.gcd"
       screens.each do |screen|
         screen.install_flavors options[:flavors]
+        screen.capture
       end
       screens.each do |screen|
-        queue.sync do
           screen.show
-        end
       end
       sleep options[:time]
     end
@@ -167,7 +165,7 @@ module Glitch
                                       KCGNullWindowID,
                                       KCGWindowImageDefault)
       bitmap = NSBitmapImageRep.alloc.initWithCGImage(image)
-      @captured_data = bitmap
+      @capture = bitmap
       return bitmap
     end
 
@@ -209,7 +207,6 @@ module Glitch
     end
 
     def generate_glitched_data
-      bitmap = capture
       @flavors.each_with_index do |f, i|
         @glitched_data = if !@glitched_data.nil?
                            if i == (@flavors.length - 1)
@@ -219,9 +216,9 @@ module Glitch
                            end
                          else
                            if i == (@flavors.length - 1)
-                             f.glitch bitmap, true
+                             f.glitch @capture, true
                            else
-                             f.glitch bitmap
+                             f.glitch @capture
                            end
                          end
       end
@@ -250,7 +247,6 @@ OptionParser.new do |opts|
   end
 
   opts.on("-s", "--screen N", Numeric, "Number of a target screen. (Default is all screens)") do |number|
-    puts number
     options[:screen] = number
   end
 
@@ -263,7 +259,6 @@ OptionParser.new do |opts|
   end
 
   opts.on("-h", "--help", "Show this message") do
-    puts opts
     exit
   end
 end.parse!
