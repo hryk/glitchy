@@ -4,22 +4,42 @@
 #
 #   http://twitter.com/negipo/status/67572370247913473
 #
+# ## Usage
+#
+#    ./glitch.rb
+#
+#    # gif flavor
+#    ./glitch.rb --flavors gif
+#
+#    ./glitch.rb --flavors gif,jpeg
+#
+#    # command line help
+#    ./glitch.rb -h
+#
+# * より高速に楽しみたい場合は
+#
+#    macrubyc glitch.rb -o glitch
+#    ./glitch
+#
 # Tested with MacRuby-0.10
 #
-# References:
+# ## Changes
 #
-#   http://d.hatena.ne.jp/Watson/20100413/1271109590
-#   http://www.cocoadev.com/index.pl?CGImageRef
-#   http://d.hatena.ne.jp/Watson/20100823/1282543331
-#   http://purigen.seesaa.net/article/137382769.html # how to access binary data in CGImageRef
+# 2012-02-01 @1VQ9
 #
-#
-# Changes
+#   * デフォルトで全ての画面をグリッチするようにした
 #
 # 2012-01-30 @1VQ9
 #
 #   * flavor追加
 #   * 中間ファイル出すのやめた
+#
+# ## References:
+#
+#   http://d.hatena.ne.jp/Watson/20100413/1271109590
+#   http://www.cocoadev.com/index.pl?CGImageRef
+#   http://d.hatena.ne.jp/Watson/20100823/1282543331
+#   http://purigen.seesaa.net/article/137382769.html # how to access binary data in CGImageRef
 #
 
 require 'optparse'
@@ -102,16 +122,10 @@ module Glitch
     # class Bmp < Base
     #   def glitch bitmap, finalize=false
     #     data   = bitmap.representationUsingType(NSBMPFileType, properties:nil)
-    #     100.times.each do
+    #     1000.times.each do
     #       pos = (rand data.length).to_i
-    #       data.bytes[pos] = 0
     #     end
-    #     bitmap_image(data)
-    #     if finalize
-    #       data
-    #     else
-    #       bitmap_image(data)
-    #     end
+    #     if finalize then data else bitmap_image data end
     #   end
     # end
 
@@ -121,9 +135,23 @@ module Glitch
     attr_accessor :number, :rect, :window
 
     def self.glitch options={}
-      screen = new options[:screen]
-      screen.install_flavors options[:flavors]
-      screen.show
+      screens = []
+      if options[:screen] == :all
+        NSScreen.screens.length.times do |i|
+          screens << new(i)
+        end
+      else
+        screens << new(options[:screen])
+      end
+      queue = Dispatch::Queue.new "com.1vq9.glitchrb.gcd"
+      screens.each do |screen|
+        screen.install_flavors options[:flavors]
+      end
+      screens.each do |screen|
+        queue.sync do
+          screen.show
+        end
+      end
       sleep options[:time]
     end
 
@@ -139,6 +167,7 @@ module Glitch
                                       KCGNullWindowID,
                                       KCGWindowImageDefault)
       bitmap = NSBitmapImageRep.alloc.initWithCGImage(image)
+      @captured_data = bitmap
       return bitmap
     end
 
@@ -147,7 +176,7 @@ module Glitch
         flavor = if Flavor.exists? name
                    Flavor.get name
                  else
-                   puts "No such flavor: #{name}"
+                   raise "No such flavor: #{name}"
                  end
         self << flavor
       end
@@ -160,7 +189,7 @@ module Glitch
     def show
       generate_glitched_data
       image = NSImage.alloc.initWithData @glitched_data
-      raise "Failed to load glitch." if image.nil?
+      raise "Failed to load image." if image.nil?
       image_view = NSImageView.alloc.initWithFrame @rect
       image_view.setImage image
       image_view.enterFullScreenMode @window.screen, withOptions:nil
@@ -208,7 +237,7 @@ app = NSApplication.sharedApplication
 
 options = {
   :flavors     => ['jpeg'],
-  :screen     => 0,
+  :screen     => :all,
   :time       => 2
 }
 
@@ -220,12 +249,12 @@ OptionParser.new do |opts|
     options[:flavors] = list
   end
 
-  opts.on("-s", "--screen N", Numeric, "Number of a target screen.") do |number|
+  opts.on("-s", "--screen N", Numeric, "Number of a target screen. (Default is all screens)") do |number|
     puts number
     options[:screen] = number
   end
 
-  opts.on("-t", "--time N", Integer,"Time to sleep (sec)") do |v|
+  opts.on("-t", "--time N", Float,"Time to sleep (sec)") do |v|
     options[:time] = v
   end
 
@@ -240,4 +269,3 @@ OptionParser.new do |opts|
 end.parse!
 
 Glitch::Screen.glitch options
-
