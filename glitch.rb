@@ -207,20 +207,9 @@ module Glitch
     end
 
     def generate_glitched_data
+      @glitched_data = @capture # initialize
       @flavors.each_with_index do |f, i|
-        @glitched_data = if !@glitched_data.nil?
-                           if i == (@flavors.length - 1)
-                             f.glitch @glitched_data, true
-                           else
-                             f.glitch @glitched_data
-                           end
-                         else
-                           if i == (@flavors.length - 1)
-                             f.glitch @capture, true
-                           else
-                             f.glitch @capture
-                           end
-                         end
+        @glitched_data = f.glitch @glitched_data, (i == (@flavors.length - 1))
       end
     end
 
