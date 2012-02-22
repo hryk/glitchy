@@ -25,6 +25,10 @@
 #
 # ## Changes
 #
+# 2012-02-23 @1VQ9
+#
+#   * png flavor追加
+#
 # 2012-02-01 @1VQ9
 #
 #   * デフォルトで全ての画面をグリッチするようにした
@@ -40,9 +44,11 @@
 #   http://www.cocoadev.com/index.pl?CGImageRef
 #   http://d.hatena.ne.jp/Watson/20100823/1282543331
 #   http://purigen.seesaa.net/article/137382769.html # how to access binary data in CGImageRef
+#   http://www.jarchive.org/akami/aka018.html (glitchpng.rb)
 #
 
 require 'optparse'
+require 'zlib'
 
 framework 'Cocoa'
 framework 'ApplicationServices'
@@ -97,6 +103,137 @@ module Glitch
     end
 
     class Png < Base
+      # in     : NSBitmapImageRep
+      # glitch : NSData ( by representationUsingType )
+      # out    : NSBitmapImageRep ( by imageRepWithData )
+      def glitch bitmap, finalize=false
+        data   = bitmap.representationUsingType(NSPNGFileType, properties:nil)
+        # header
+        header = Pointer.new(:char, 8)
+        data.getBytes(header, range:nsrange(0..7))
+        head   = pointer_to_array(header).pack('C*')
+        # Chunks
+        # length(4), type(4), data(length), crc(4)
+        state = :length
+        pos   = 8
+        buf_length = Pointer.new(:char, 4)
+        buf_type   = Pointer.new(:char, 4)
+        buf_crc    = Pointer.new(:char, 4)
+        new_idat   = ""
+        tail       = ""
+        ihdr       = ""
+        plte       = ""
+        ihdr_flag  = false
+        plte_flag  = false
+
+        loop do
+          break if pos >= data.length
+          case state
+          when :length
+            data.getBytes(buf_length, range:nsrange(pos, 4))
+            pos += 4
+            state = :type
+          when :type
+            data.getBytes(buf_type, range:nsrange(pos, 4))
+            pos += 4
+            state = :data
+          when :data
+            len  = pointer_to_32uint(buf_length)
+            type = pointer_to_array(buf_type).pack('C*').to_s
+            if len > 0
+              buf_data = Pointer.new(:char, len)
+              data.getBytes(buf_data, range:nsrange(pos, len))
+              case type
+              when 'IDAT'
+                new_idat += pointer_to_array(buf_data).pack('C*')
+              when 'IHDR'
+                ihdr = [len].pack('N') + 'IHDR' + pointer_to_array(buf_data).pack('C*')
+                ihdr_flag = true
+              when 'iCCP'
+                plte = pointer_to_array(buf_length).pack('C*') + 'iCCP' + pointer_to_array(buf_data).pack('C*')
+                plte_flag = true
+              end
+            end
+            pos += len
+            state = :crc
+          when :crc
+            if ihdr_flag
+              data.getBytes(buf_crc, range:nsrange(pos, 4))
+              ihdr += pointer_to_array(buf_crc).pack('C*')
+              ihdr_flag = false
+            elsif plte_flag
+              data.getBytes(buf_crc, range:nsrange(pos, 4))
+              plte += pointer_to_array(buf_crc).pack('C*')
+              plte_flag = false
+            end
+            pos += 4
+            state = :length
+          else
+          end
+        end
+        raw = Zlib::Inflate.new.inflate(new_idat)
+        tmp_array = raw.unpack('C*')
+        # Glitch
+        (500..(tmp_array.size - 1)).each do |i|
+          if (rand(10) % 6) > 2 && (tmp_array[i] == 3 || tmp_array[i] == 2)
+            tmp_array[i] = rand(5).to_i
+          end
+        end
+        cmp = Zlib::Deflate.deflate(tmp_array.pack('C*'))
+        size = [cmp.size].pack('N')
+        new_data = size + 'IDAT' + cmp
+        crc = [Zlib.crc32(cmp, Zlib.crc32('IDAT'))].pack('N')
+        iend = [0].pack('N') + 'IEND' + [Zlib.crc32('IEND')].pack('N')
+        glitched_data = head + ihdr + plte + new_data + crc + iend
+        data_array = glitched_data.unpack('C*')
+        buffer = Pointer.new(:char, data_array.size)
+        data_array.each_with_index do |d, i|
+          buffer[i] = d
+        end
+        glitched_nsdata = NSData.alloc.initWithBytes(buffer, length: data_array.size)
+        if finalize
+          glitched_nsdata
+        else
+          bitmap_image(glitched_nsdata)
+        end
+      end
+
+      protected
+
+      def pointer_to_32uint(pointer)
+        string = ''
+        string += [pointer[0]].pack('C')
+        string += [pointer[1]].pack('C')
+        string += [pointer[2]].pack('C')
+        string += [pointer[3]].pack('C')
+        string.unpack("N").first.to_i
+      end
+
+      def pointer_to_array(pointer, cast=nil)
+        array = []
+        pos   = 0
+        loop do
+          begin
+            array << pointer[pos]
+          rescue
+            break
+          end
+          pos += 1
+        end
+        array
+      end
+
+      def nsrange(range_or_start, len=nil)
+        ns = NSRange.new
+        if range_or_start.kind_of? Range
+          ns.location = range_or_start.first
+          ns.length = range_or_start.end - range_or_start.first + 1
+        elsif range_or_start.kind_of? Fixnum
+          ns.location = range_or_start
+          ns.length   = len
+        end
+        ns
+      end
     end
 
     class Tiff < Base
