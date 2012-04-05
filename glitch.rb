@@ -134,7 +134,7 @@ module Glitch
         #   http://www.libpng.org/pub/png/spec/1.2/PNG-Filters.html
         #
         #    Type    Name
-        #     
+        #
         #    0       None
         #    1       Sub
         #    2       Up
@@ -336,6 +336,7 @@ module Glitch
       end
       screens.each do |screen|
           screen.show
+          screen.write if options[:output]
       end
       sleep options[:time]
     end
@@ -382,6 +383,13 @@ module Glitch
       @window.setContentView image_view
     end
 
+    def write
+      image = NSBitmapImageRep.imageRepWithData @glitched_data
+      raise "Failed to load image." if image.nil?
+      data = image.representationUsingType(NSPNGFileType, properties:nil)
+      data.writeToFile "#{ENV['HOME']}/Desktop/GlitchedCapture_#{@number}.png", atomically:false
+    end
+
     protected
 
     def init_window
@@ -411,7 +419,8 @@ app = NSApplication.sharedApplication
 options = {
   :flavors     => ['jpeg'],
   :screen     => :all,
-  :time       => 2
+  :time       => 2,
+  :output     => false
 }
 
 OptionParser.new do |opts|
@@ -424,6 +433,10 @@ OptionParser.new do |opts|
 
   opts.on("-s", "--screen N", Numeric, "Number of a target screen. (Default is all screens)") do |number|
     options[:screen] = number
+  end
+
+  opts.on("-o", "--output") do |v|
+    options[:output] = v
   end
 
   opts.on("-t", "--time N", Float,"Time to sleep (sec)") do |v|
