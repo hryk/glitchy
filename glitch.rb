@@ -470,7 +470,8 @@ module Glitch
           image_view = self.show_image(image)
           main = Dispatch::Queue.main
           main.after(1) {
-            image_view.removeFromSuperview
+            image_view.exitFullScreenModeWithOptions nil
+            @window.close
           }
         end
       else
