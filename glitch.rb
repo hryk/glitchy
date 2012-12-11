@@ -53,11 +53,61 @@
 
 require 'optparse'
 require 'zlib'
+begin
+  require 'rubygems'
+  require 'control_tower'
+  require 'rack'
+rescue LoadError
+  HAS_CTRL_TWR = false
+else
+  HAS_CTRL_TWR = true
+end
 
 framework 'Cocoa'
 framework 'ApplicationServices'
 
 module Glitch
+
+  class Server
+    attr_reader :options
+
+    def self.run options
+      ControlTower::Server.new(self.new(options),
+                               {:host => "localhost", :port => 9999, :concurrent => false}).start
+    end
+
+    def initialize(options)
+      @options = options
+    end
+
+    def applicationDidFinishLaunching(notification)
+      NSLog("Glitch server started.")
+      queue = Dispatch::Queue.concurrent(:default)
+      queue.async {
+        ControlTower::Server.new(self,
+                                 {:host => "localhost", :port => 9999, :concurrent => false}).start
+      }
+    end
+
+    def call(env)
+      req = Rack::Request.new env
+      params = req.params
+      glitch_opts = options.merge(Hash[params.map{|k, v| [k.to_sym, v] }])
+      if req.fullpath =~ /\/screens\/{0,1}/
+        puts '/screens/'
+        NSLog("glitch start")
+        Glitch::Screen.glitch glitch_opts
+        [200, {"Content-Type" => "text/html"}, "Glitched."]
+      else
+        NSLog(req.fullpath)
+        [404, {"Content-Type" => "text/html"}, "Try /screens/ or /screens/0 "]
+      end
+    rescue => e
+      puts e
+      puts e.backtrace
+      [500, {"Content-Type" => "text/html"}, "Error."]
+    end
+  end
 
   # == Glitch::Flavor
   #
@@ -68,7 +118,7 @@ module Glitch
         exist = true
         begin
           self.const_get class_name
-        rescue NameError => e
+        rescue NameError
           exist = false
         end
         return exist
@@ -392,15 +442,40 @@ module Glitch
       @flavors << flavor
     end
 
+    def show_image(image)
+        image_view = NSImageView.alloc.initWithFrame @rect
+        image_view.setImage image
+        image_view.setNeedsDisplay true
+        image_view.enterFullScreenMode @window.screen, withOptions:nil
+        image_view
+    end
+
+    def test(image)
+      NSLog("Glitch::Screen#show")
+    end
+
+    # NSApplicationで使う場合のメソッドとスクリプトで使う場合のメソッドは分けた方がよさそう。
     def show
       generate_glitched_data
       image = NSImage.alloc.initWithData @glitched_data
-      raise "Failed to load image." if image.nil?
-      image_view = NSImageView.alloc.initWithFrame @rect
-      image_view.setImage image
-      image_view.enterFullScreenMode @window.screen, withOptions:nil
-      @window.orderFrontRegardless
-      @window.setContentView image_view
+      NSLog("Glitch::Screen#show")
+      if !image.nil? && image.isValid
+        if NSThread.isMainThread
+          NSLog("This is main thread")
+          image_view = self.show_image(image)
+          @window.orderFrontRegardless
+          @window.setContentView image_view
+        else
+          NSLog("This is not main thread")
+          image_view = self.show_image(image)
+          main = Dispatch::Queue.main
+          main.after(1) {
+            image_view.removeFromSuperview
+          }
+        end
+      else
+        raise "Failed to load image."
+      end
     end
 
     def write
@@ -440,12 +515,17 @@ options = {
   :flavors     => ['jpeg'],
   :screen     => :all,
   :time       => 2,
-  :output     => false
+  :output     => false,
+  :server     => false
 }
 
 OptionParser.new do |opts|
   opts.banner = "Usage: glitch.rb [options]"
   opts.separator "Options:"
+
+  opts.on("--server", TrueClass) do |v|
+    options[:server] = v
+  end
 
   opts.on("-f", "--flavors x,y,z", Array,
           "Specify flavor of glitch.To use multiple flavors, separate by comma."
@@ -471,4 +551,14 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-Glitch::Screen.glitch options
+if options[:server]
+  if HAS_CTRL_TWR
+    srv = Glitch::Server.new options
+    app.setDelegate(srv)
+    app.run
+  else
+    abort "Server mode requires control_tower. To install it, type 'macgem install control_tower'"
+  end
+else
+  Glitch::Screen.glitch options
+end
