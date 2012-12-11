@@ -23,6 +23,10 @@
 #
 # Tested with MacRuby-0.10
 #
+# ## TODO
+#
+#   * https://twitter.com/todesking/status/278393897238003712
+#
 # ## Changes
 #
 # 2012-02-23 @1VQ9
@@ -55,6 +59,8 @@ framework 'ApplicationServices'
 
 module Glitch
 
+  # == Glitch::Flavor
+  #
   module Flavor
     class << self
       def exists? name
@@ -78,12 +84,16 @@ module Glitch
       end
     end
 
+    # == Glitch::Flavor::Base
+    #
     class Base
       def bitmap_image data
         NSBitmapImageRep.imageRepWithData data
       end
     end
 
+    # == Glitch::Flavor::Jpeg
+    #
     class Jpeg < Base
       # in     : NSBitmapImageRep
       # glitch : NSData ( by representationUsingType )
@@ -102,6 +112,8 @@ module Glitch
       end
     end
 
+    # == Glitch::Flavor::Png
+    #
     class Png < Base
       # in     : NSBitmapImageRep
       # glitch : NSData ( by representationUsingType )
@@ -144,8 +156,8 @@ module Glitch
         (0..(image_bytes.size - 1)).each do |i|
           #if (rand(10) % 6) > 2 && image_bytes[i] == 2
           #  image_bytes[i] = rand(5)
-          if image_bytes[i] > 250 && (rand(10) % 6) > 4
-            image_bytes[i] = rand(100)
+          if image_bytes[i] > 10 && image_bytes[i] < 17 && (rand(10) % 6) > 4
+            image_bytes[i] = rand(255)
           end
         end
         image_bytes
@@ -286,9 +298,13 @@ module Glitch
       end
     end
 
+    # == Glitch::Flavor::Tiff
+    #
     class Tiff < Base
     end
 
+    # == Glitch::Flavor::Gif
+    #
     class Gif < Base
       def glitch bitmap, finalize=false
       data   = bitmap.representationUsingType(NSGIFFileType, properties:nil)
@@ -315,9 +331,10 @@ module Glitch
     #     if finalize then data else bitmap_image data end
     #   end
     # end
-
   end
 
+  # == Glitch::Screen
+  #
   class Screen
     attr_accessor :number, :rect, :window
 
@@ -330,15 +347,18 @@ module Glitch
       else
         screens << new(options[:screen])
       end
+
       screens.each do |screen|
         screen.install_flavors options[:flavors]
         screen.capture
       end
+
       screens.each do |screen|
-          screen.show
-          screen.write if options[:output]
+        screen.show
+        screen.write if options[:output]
       end
-      sleep options[:time]
+
+      sleep options[:time] if options[:time]
     end
 
     def initialize screen_number
@@ -427,15 +447,18 @@ OptionParser.new do |opts|
   opts.banner = "Usage: glitch.rb [options]"
   opts.separator "Options:"
 
-  opts.on("-f", "--flavors x,y,z", Array, "Specify flavor of glitch.To use multiple flavors, separate by comma.") do |list|
+  opts.on("-f", "--flavors x,y,z", Array,
+          "Specify flavor of glitch.To use multiple flavors, separate by comma."
+         ) do |list|
     options[:flavors] = list
   end
 
-  opts.on("-s", "--screen N", Numeric, "Number of a target screen. (Default is all screens)") do |number|
+  opts.on("-s", "--screen N", Numeric,
+          "Number of a target screen. (Default is all screens)") do |number|
     options[:screen] = number
   end
 
-  opts.on("-o", "--output") do |v|
+  opts.on("-o", "--output", String) do |v|
     options[:output] = v
   end
 
@@ -445,10 +468,6 @@ OptionParser.new do |opts|
 
   opts.on("-v", "--[no-]verbose", "Run verbosely") do |v|
     options[:verbose] = v
-  end
-
-  opts.on("-h", "--help", "Show this message") do
-    exit
   end
 end.parse!
 
