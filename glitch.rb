@@ -520,6 +520,7 @@ module Glitch
           main.after(1) {
             image_view.exitFullScreenModeWithOptions nil
             @window.close
+            NSApplication.sharedApplication.hide nil
           }
         end
       else
