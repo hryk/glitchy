@@ -9,25 +9,46 @@
 #    ./glitch.rb
 #
 #    # gif flavor
-#    ./glitch.rb --flavors gif
+#    % ./glitch.rb --flavors gif
 #
-#    ./glitch.rb --flavors gif,jpeg
+#    % ./glitch.rb --flavors gif,jpeg
 #
 #    # command line help
-#    ./glitch.rb -h
+#    % ./glitch.rb -h
 #
 # * より高速に楽しみたい場合は
 #
-#    macrubyc glitch.rb -o glitch
-#    ./glitch
+#    % macrubyc glitch.rb -o glitch
+#    % ./glitch
+#
+# * 常用したい場合は (control_towerが必要です)
+#
+#    # Start glitch server.
+#    % ./glitch.rb --server
+#
+#    # Glitch all screens.
+#    % curl http://localhost:9999/screens
+#
+#    # Glitch selected screen.
+#    % curl http://localhost:9999/screens/0
+#
+#    # Passing parameters.
+#    % curl http://localhost:9999/screens?flavors=png,gif
 #
 # Tested with MacRuby-0.10
 #
 # ## TODO
 #
+#   * png flavorが遅い。
+#   * スクリーン指定した場合にグリッチさせないスクリーンが真っ暗になる。
+#     グリッチさせながら作業できないので困る。
 #   * https://twitter.com/todesking/status/278393897238003712
 #
 # ## Changes
+#
+# 2012-12-12 @1VQ9
+#
+#   * --serverオプション追加
 #
 # 2012-02-23 @1VQ9
 #
@@ -71,42 +92,69 @@ module Glitch
   class Server
     attr_reader :options
 
-    def self.run options
-      ControlTower::Server.new(self.new(options),
-                               {:host => "localhost", :port => 9999, :concurrent => false}).start
-    end
-
     def initialize(options)
+      [:screen, :output, :server].each do |k|
+        options.delete k
+      end
       @options = options
     end
 
     def applicationDidFinishLaunching(notification)
-      NSLog("Glitch server started.")
+      server_opts = {:host => "localhost",
+                     :port => 9999,
+                     :concurrent => true}
       queue = Dispatch::Queue.concurrent(:default)
       queue.async {
-        ControlTower::Server.new(self,
-                                 {:host => "localhost", :port => 9999, :concurrent => false}).start
+        ControlTower::Server.new(self,server_opts).start
       }
+      NSLog("Glitch server started. http://#{server_opts[:host]}:#{server_opts[:port]}")
+      NSLog("Example: http://#{server_opts[:host]}:#{server_opts[:port]}/screens")
     end
 
     def call(env)
       req = Rack::Request.new env
-      params = req.params
-      glitch_opts = options.merge(Hash[params.map{|k, v| [k.to_sym, v] }])
-      if req.fullpath =~ /\/screens\/{0,1}/
-        puts '/screens/'
-        NSLog("glitch start")
+      glitch_opts = normalize_options(req.params)
+      code, response = 200, ""
+      NSLog("#{req.request_method}: #{req.path_info}")
+
+      if req.path_info =~ /\/screens\/{0,1}$/
+        glitch_opts[:screen] = :all
+        NSLog("glitch: #{glitch_opts.inspect}")
         Glitch::Screen.glitch glitch_opts
-        [200, {"Content-Type" => "text/html"}, "Glitched."]
+        response = "Glitched."
+      elsif req.path_info =~ /\/screens\/(\d+?)$/
+        glitch_opts[:screen] = $1.to_i
+        NSLog("glitch: #{glitch_opts.inspect}")
+        Glitch::Screen.glitch glitch_opts
+        response = "Screen #{glitch_opts[:screen]} Glitched."
       else
         NSLog(req.fullpath)
-        [404, {"Content-Type" => "text/html"}, "Try /screens/ or /screens/0 "]
+        code     = 404
+        response = "Try /screens/ or /screens/0 "
       end
+      # Return Response.
+      [
+        code,
+        {"Content-Type" => "text/html;charset=utf-8"},
+        response
+      ]
     rescue => e
       puts e
       puts e.backtrace
       [500, {"Content-Type" => "text/html"}, "Error."]
     end
+
+    protected
+
+    def normalize_options(params)
+      opt = @options.merge Hash[params.map{|k, v|
+        if k == 'flavors'
+          v = v.split(',')
+        end
+        [k.to_sym, v]
+      }]
+    end
+
   end
 
   # == Glitch::Flavor
@@ -445,7 +493,6 @@ module Glitch
     def show_image(image)
         image_view = NSImageView.alloc.initWithFrame @rect
         image_view.setImage image
-        image_view.setNeedsDisplay true
         image_view.enterFullScreenMode @window.screen, withOptions:nil
         image_view
     end
@@ -494,7 +541,8 @@ module Glitch
                                                    styleMask:NSBorderlessWindowMask,
                                                    backing:NSBackingStoreBuffered,
                                                    defer:false)
-      @window.setBackgroundColor(NSColor.blackColor)
+      @window.setBackgroundColor(NSColor.clearColor)
+      @window.setOpaque false
     end
 
     def generate_glitched_data
