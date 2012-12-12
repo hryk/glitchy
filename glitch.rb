@@ -572,7 +572,7 @@ OptionParser.new do |opts|
   opts.banner = "Usage: glitch.rb [options]"
   opts.separator "Options:"
 
-  opts.on("--server", TrueClass) do |v|
+  opts.on("--server", TrueClass, "Start glitch server.") do |v|
     options[:server] = v
   end
 
