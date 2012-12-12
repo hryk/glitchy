@@ -9,25 +9,46 @@
 #    ./glitch.rb
 #
 #    # gif flavor
-#    ./glitch.rb --flavors gif
+#    % ./glitch.rb --flavors gif
 #
-#    ./glitch.rb --flavors gif,jpeg
+#    % ./glitch.rb --flavors gif,jpeg
 #
 #    # command line help
-#    ./glitch.rb -h
+#    % ./glitch.rb -h
 #
 # * より高速に楽しみたい場合は
 #
-#    macrubyc glitch.rb -o glitch
-#    ./glitch
+#    % macrubyc glitch.rb -o glitch
+#    % ./glitch
+#
+# * 常用したい場合は (control_towerが必要です)
+#
+#    # Start glitch server.
+#    % ./glitch.rb --server
+#
+#    # Glitch all screens.
+#    % curl http://localhost:9999/screens
+#
+#    # Glitch selected screen.
+#    % curl http://localhost:9999/screens/0
+#
+#    # Passing parameters.
+#    % curl http://localhost:9999/screens?flavors=png,gif
 #
 # Tested with MacRuby-0.10
 #
 # ## TODO
 #
+#   * png flavorが遅い。
+#   * スクリーン指定した場合にグリッチさせないスクリーンが真っ暗になる。
+#     グリッチさせながら作業できないので困る。
 #   * https://twitter.com/todesking/status/278393897238003712
 #
 # ## Changes
+#
+# 2012-12-12 @1VQ9
+#
+#   * --serverオプション追加
 #
 # 2012-02-23 @1VQ9
 #
@@ -53,11 +74,88 @@
 
 require 'optparse'
 require 'zlib'
+begin
+  require 'rubygems'
+  require 'control_tower'
+  require 'rack'
+rescue LoadError
+  HAS_CTRL_TWR = false
+else
+  HAS_CTRL_TWR = true
+end
 
 framework 'Cocoa'
 framework 'ApplicationServices'
 
 module Glitch
+
+  class Server
+    attr_reader :options
+
+    def initialize(options)
+      [:screen, :output, :server].each do |k|
+        options.delete k
+      end
+      @options = options
+    end
+
+    def applicationDidFinishLaunching(notification)
+      server_opts = {:host => "localhost",
+                     :port => 9999,
+                     :concurrent => true}
+      queue = Dispatch::Queue.concurrent(:default)
+      queue.async {
+        ControlTower::Server.new(self,server_opts).start
+      }
+      NSLog("Glitch server started. http://#{server_opts[:host]}:#{server_opts[:port]}")
+      NSLog("Example: http://#{server_opts[:host]}:#{server_opts[:port]}/screens")
+    end
+
+    def call(env)
+      req = Rack::Request.new env
+      glitch_opts = normalize_options(req.params)
+      code, response = 200, ""
+      NSLog("#{req.request_method}: #{req.path_info}")
+
+      if req.path_info =~ /\/screens\/{0,1}$/
+        glitch_opts[:screen] = :all
+        NSLog("glitch: #{glitch_opts.inspect}")
+        Glitch::Screen.glitch glitch_opts
+        response = "Glitched."
+      elsif req.path_info =~ /\/screens\/(\d+?)$/
+        glitch_opts[:screen] = $1.to_i
+        NSLog("glitch: #{glitch_opts.inspect}")
+        Glitch::Screen.glitch glitch_opts
+        response = "Screen #{glitch_opts[:screen]} Glitched."
+      else
+        NSLog(req.fullpath)
+        code     = 404
+        response = "Try /screens/ or /screens/0 "
+      end
+      # Return Response.
+      [
+        code,
+        {"Content-Type" => "text/html;charset=utf-8"},
+        response
+      ]
+    rescue => e
+      puts e
+      puts e.backtrace
+      [500, {"Content-Type" => "text/html"}, "Error."]
+    end
+
+    protected
+
+    def normalize_options(params)
+      opt = @options.merge Hash[params.map{|k, v|
+        if k == 'flavors'
+          v = v.split(',')
+        end
+        [k.to_sym, v]
+      }]
+    end
+
+  end
 
   # == Glitch::Flavor
   #
@@ -68,7 +166,7 @@ module Glitch
         exist = true
         begin
           self.const_get class_name
-        rescue NameError => e
+        rescue NameError
           exist = false
         end
         return exist
@@ -392,15 +490,40 @@ module Glitch
       @flavors << flavor
     end
 
+    def show_image(image)
+        image_view = NSImageView.alloc.initWithFrame @rect
+        image_view.setImage image
+        image_view.enterFullScreenMode @window.screen, withOptions:nil
+        image_view
+    end
+
+    def test(image)
+      NSLog("Glitch::Screen#show")
+    end
+
+    # NSApplicationで使う場合のメソッドとスクリプトで使う場合のメソッドは分けた方がよさそう。
     def show
       generate_glitched_data
       image = NSImage.alloc.initWithData @glitched_data
-      raise "Failed to load image." if image.nil?
-      image_view = NSImageView.alloc.initWithFrame @rect
-      image_view.setImage image
-      image_view.enterFullScreenMode @window.screen, withOptions:nil
-      @window.orderFrontRegardless
-      @window.setContentView image_view
+      NSLog("Glitch::Screen#show")
+      if !image.nil? && image.isValid
+        if NSThread.isMainThread
+          NSLog("This is main thread")
+          image_view = self.show_image(image)
+          @window.orderFrontRegardless
+          @window.setContentView image_view
+        else
+          NSLog("This is not main thread")
+          image_view = self.show_image(image)
+          main = Dispatch::Queue.main
+          main.after(1) {
+            image_view.exitFullScreenModeWithOptions nil
+            @window.close
+          }
+        end
+      else
+        raise "Failed to load image."
+      end
     end
 
     def write
@@ -418,7 +541,8 @@ module Glitch
                                                    styleMask:NSBorderlessWindowMask,
                                                    backing:NSBackingStoreBuffered,
                                                    defer:false)
-      @window.setBackgroundColor(NSColor.blackColor)
+      @window.setBackgroundColor(NSColor.clearColor)
+      @window.setOpaque false
     end
 
     def generate_glitched_data
@@ -440,12 +564,17 @@ options = {
   :flavors     => ['jpeg'],
   :screen     => :all,
   :time       => 2,
-  :output     => false
+  :output     => false,
+  :server     => false
 }
 
 OptionParser.new do |opts|
   opts.banner = "Usage: glitch.rb [options]"
   opts.separator "Options:"
+
+  opts.on("--server", TrueClass, "Start glitch server.") do |v|
+    options[:server] = v
+  end
 
   opts.on("-f", "--flavors x,y,z", Array,
           "Specify flavor of glitch.To use multiple flavors, separate by comma."
@@ -471,4 +600,14 @@ OptionParser.new do |opts|
   end
 end.parse!
 
-Glitch::Screen.glitch options
+if options[:server]
+  if HAS_CTRL_TWR
+    srv = Glitch::Server.new options
+    app.setDelegate(srv)
+    app.run
+  else
+    abort "Server mode requires control_tower. To install it, type 'macgem install control_tower'"
+  end
+else
+  Glitch::Screen.glitch options
+end
