@@ -40,9 +40,10 @@
 # ## TODO
 #
 #   * png flavorが遅い。
+#   * グリッチした後フォーカスがあたるのがうざい。(http://twitter.com/todesking/status/278808484588441600)
 #   * スクリーン指定した場合にグリッチさせないスクリーンが真っ暗になる。
 #     グリッチさせながら作業できないので困る。
-#   * https://twitter.com/todesking/status/278393897238003712
+#   * 遅い(https://twitter.com/todesking/status/278393897238003712)
 #
 # ## Changes
 #
