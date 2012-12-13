@@ -40,9 +40,7 @@ module Glitchy
                                       KCGWindowListOptionOnScreenOnly,
                                       KCGNullWindowID,
                                       KCGWindowImageDefault)
-      bitmap = NSBitmapImageRep.alloc.initWithCGImage(image)
-      @capture = bitmap
-      return bitmap
+      @capture = NSBitmapImageRep.alloc.initWithCGImage(image)
     end
 
     def install_flavors flavors
