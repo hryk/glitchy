@@ -11,11 +11,11 @@ A tiny tool for glitch displays. Only on the [MacRuby](http://macruby.org).
 
 To glitch your display, just type:
 
-    % glitchy
+    % glitch.rb
 
 `flavors` option changes type of glitch.
 
-    % glitchy --flavors png
+    % glitch.rb --flavors png
 
 Available flavors are below.
 
@@ -25,11 +25,11 @@ Available flavors are below.
 
 `flavors` option accept comma seperated multiple values.
 
-    % glitchy --flavors gif,jpeg
+    % glitch.rb --flavors gif,jpeg
 
 `help` option shows description of flags.
 
-    % glitchy -h
+    % glitch.rb -h
 
 You can speed up glitchy with [rubygems-compile](https://github.com/ferrous26/rubygems-compile).
 
@@ -38,7 +38,7 @@ You can speed up glitchy with [rubygems-compile](https://github.com/ferrous26/ru
 
 `glitchy` runs as server with `--server` option.
 
-    % glitchy --server [--host HOSTNAME] [--port PORT]
+    % glitch.rb --server [--host HOSTNAME] [--port PORT]
 
 glitchy server cause glitch on displays in response to HTTP GET request.
 
