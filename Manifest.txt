@@ -1,0 +1,14 @@
+Changes
+Manifest.txt
+README.md
+Rakefile
+bin/glitch.rb
+lib/glitchy.rb
+lib/glitchy/flavor.rb
+lib/glitchy/flavor/base.rb
+lib/glitchy/flavor/gif.rb
+lib/glitchy/flavor/jpeg.rb
+lib/glitchy/flavor/png.rb
+lib/glitchy/flavor/tiff.rb
+lib/glitchy/screen.rb
+lib/glitchy/server.rb
