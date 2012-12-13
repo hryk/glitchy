@@ -35,12 +35,12 @@ module Glitchy
       if req.path_info =~ /\/screens\/{0,1}$/
         glitch_opts[:screen] = :all
         NSLog("glitch: #{glitch_opts.inspect}")
-        Glitch::Screen.glitch glitch_opts
+        Glitchy::Screen.glitch glitch_opts
         response = "Glitched."
       elsif req.path_info =~ /\/screens\/(\d+?)$/
         glitch_opts[:screen] = $1.to_i
         NSLog("glitch: #{glitch_opts.inspect}")
-        Glitch::Screen.glitch glitch_opts
+        Glitchy::Screen.glitch glitch_opts
         response = "Screen #{glitch_opts[:screen]} Glitched."
       else
         NSLog(req.fullpath)
