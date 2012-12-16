@@ -3,6 +3,7 @@
 framework 'Cocoa'
 framework 'ApplicationServices'
 
+require 'glitchy/image'
 require 'glitchy/flavor'
 require 'glitchy/screen'
 require 'glitchy/server'

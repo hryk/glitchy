@@ -4,8 +4,9 @@ module Glitchy
   # == Glitch::Screen
   #
   class Screen
-    attr_accessor :number, :rect, :window
+    attr_reader :number, :rect, :window
 
+    # DEPRECATED
     def self.glitch options={}
       screens = []
       if options[:screen] == :all
@@ -65,10 +66,6 @@ module Glitchy
       image_view
     end
 
-    def test(image)
-      NSLog("Glitch::Screen#show")
-    end
-
     # NSApplicationで使う場合のメソッドとスクリプトで使う場合のメソッドは分けた方がよさそう。
     def show
       generate_glitched_data
@@ -85,8 +82,8 @@ module Glitchy
           image_view = self.show_image(image)
           main = Dispatch::Queue.main
           main.after(1) {
+            self.clear!
             image_view.exitFullScreenModeWithOptions nil
-            @window.close
             NSApplication.sharedApplication.hide nil
           }
         end
@@ -95,9 +92,17 @@ module Glitchy
       end
     end
 
-    def write
+    def clear!
+      # Uninstall flavor
+      @capture       = nil
+      @glitched_data = nil
+      @flavor  = []
+      @window.close()
+    end
+
+    def write(path=nil)
       image = NSBitmapImageRep.imageRepWithData @glitched_data
-      raise "Failed to load image." if image.nil?
+      raise "Failed to load image." if image.nil? || !image.isValid
       data = image.representationUsingType(NSPNGFileType, properties:nil)
       data.writeToFile "#{ENV['HOME']}/Desktop/GlitchedCapture_#{@number}.png", atomically:false
     end
@@ -106,10 +111,15 @@ module Glitchy
 
     def init_window
       @rect   = NSScreen.screens[@number].frame()
-      @window = NSWindow.alloc.initWithContentRect(@rect,
-                                                   styleMask:NSBorderlessWindowMask,
-                                                   backing:NSBackingStoreBuffered,
-                                                   defer:false)
+      main_window = NSApplication.sharedApplication.mainWindow
+      if main_window.nil?
+        @window = NSWindow.alloc.initWithContentRect(@rect,
+                                                     styleMask:NSBorderlessWindowMask,
+                                                     backing:NSBackingStoreBuffered,
+                                                     defer:false)
+      else
+        @window = NSApplication.sharedApplication.mainWindow
+      end
       @window.setBackgroundColor(NSColor.clearColor)
       @window.setOpaque false
     end
