@@ -32,9 +32,15 @@ describe Glitchy::Image do
   end
 
   describe "binary handling functions" do
-    it '#pointer_to_uint32'
+    subject { Glitchy::Image.new('spec/data/cc.logo.large.png') }
+    it '#pointer_to_uint32' do
+    end
     it '#pointer_to_array'
-    it '#pointer_to_s'
+    it '#pointer_to_s' do
+      subject.format.should eq(:png)
+      pointer = subject[0,3]
+      subject.pointer_to_s(pointer).should eq('PNG')
+    end
     it '#nsrange with range'
     it '#nsrange with start and length'
   end

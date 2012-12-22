@@ -40,10 +40,10 @@ module Glitchy
     end
 
     def glitch(flavor, flavor_opt={})
-      nsdata = if flavor.kind_of? Glitchy::Flavor::Base
+      nsdata = if flavor.kind_of? Flavor::Base
                  flavor.glitch(self, flavor_opt)
-               elsif Glitchy::Flavor.exists(flavor)
-                 Glitchy::Flavor.get(flavor, flavor_opt).glitch(self)
+               elsif Flavor.exists(flavor)
+                 Flavor.get(flavor, flavor_opt).glitch(self)
                end
       swap(nsdata)
     end
