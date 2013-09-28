@@ -1,4 +1,5 @@
 # encoding: utf-8
+
 require 'control_tower'
 require 'rack'
 
@@ -62,7 +63,7 @@ module Glitchy
     protected
 
     def normalize_options(params)
-      opt = @options.merge Hash[params.map{|k, v|
+      @options.merge Hash[params.map{|k, v|
         if k == 'flavors'
           v = v.split(',')
         end

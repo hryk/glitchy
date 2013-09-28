@@ -84,12 +84,17 @@ OptionParser.new do |opts|
 end.parse!
 
 if options[:server]
-  if HAS_CTRL_TWR
+  if  Glitchy::SERVER_OK
     srv = Glitchy::Server.new options
     app.setDelegate(srv)
     app.run
   else
-    abort "Server mode requires control_tower. To install it, type 'macgem install control_tower'"
+    $stderr.puts <<-EOF
+glitchy server mode requires 'control_tower'. try:
+
+    $ (mac)gem install control_tower
+    $ glitch.rb --server
+EOF
   end
 else
   Glitchy::Screen.glitch options
