@@ -12,7 +12,7 @@ Hoe.plugin :gemspec
 Hoe.spec 'glitchy' do
   developer 'hryk', 'hiroyuki@1vq9.com'
   license 'MIT'
-  dependency "control_tower", ">= 1.0", :runtime
+  # dependency "control_tower", ">= 1.0", :runtime
   self.history_file = 'Changes'
   self.readme_file = 'README.md'
   self.extra_dev_deps += [
