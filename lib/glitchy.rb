@@ -2,6 +2,7 @@
 
 framework 'Cocoa'
 framework 'ApplicationServices'
+framework 'CoreGraphics'
 
 require 'glitchy/image'
 require 'glitchy/flavor'

@@ -69,7 +69,8 @@ OptionParser.new do |opts|
     options[:screen] = number
   end
 
-  opts.on("-o", "--output", String) do |v|
+  opts.on("-o", "--output PATH", String,
+          "Output filepath. Default is ~/Desktop/GlitchedCapture_[SCREENNUMBER].png") do |v|
     options[:output] = v
   end
 

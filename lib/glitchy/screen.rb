@@ -24,7 +24,7 @@ module Glitchy
 
       screens.each do |screen|
         screen.show
-        screen.write if options[:output]
+        screen.write(options[:output]) if options[:output]
       end
 
       sleep options[:time] if options[:time]
@@ -38,9 +38,9 @@ module Glitchy
 
     def capture
       image = CGWindowListCreateImage(NSRectToCGRect(@rect),
-                                      KCGWindowListOptionOnScreenOnly,
-                                      KCGNullWindowID,
-                                      KCGWindowImageDefault)
+                                      ::KCGWindowListOptionOnScreenOnly,
+                                      ::KCGNullWindowID,
+                                      ::KCGWindowImageDefault)
       @capture = NSBitmapImageRep.alloc.initWithCGImage(image)
     end
 
@@ -101,10 +101,11 @@ module Glitchy
     end
 
     def write(path=nil)
+      path ||= "#{ENV['HOME']}/Desktop/GlitchedCapture_#{@number}.png"
       image = NSBitmapImageRep.imageRepWithData @glitched_data
-      raise "Failed to load image." if image.nil? || !image.isValid
+      raise "Failed to load image." if image.nil?
       data = image.representationUsingType(NSPNGFileType, properties:nil)
-      data.writeToFile "#{ENV['HOME']}/Desktop/GlitchedCapture_#{@number}.png", atomically:false
+      data.writeToFile path, atomically:false
     end
 
     protected
